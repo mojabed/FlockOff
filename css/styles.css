@@ -139,6 +139,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-top: var(--nav-height);
   position: relative;
   overflow: hidden;
   background:
