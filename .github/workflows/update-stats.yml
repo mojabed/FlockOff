@@ -1,0 +1,44 @@
+name: Update DeFlock Stats
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # daily at 6am UTC
+  workflow_dispatch:      # allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch DeFlock camera count
+        id: fetch
+        run: |
+          # Fetch the DeFlock homepage and extract the camera count
+          # The page contains text like "60,591 LPRs mapped in the USA"
+          COUNT=$(curl -sL https://deflock.org | grep -oP '\d{1,3}(?:,\d{3})*\s+LPRs mapped' | grep -oP '[\d,]+' | head -1)
+          if [ -z "$COUNT" ]; then
+            echo "Failed to extract count, keeping previous value"
+            exit 0
+          fi
+          # Remove commas for JSON number
+          NUM=$(echo "$COUNT" | tr -d ',')
+          echo "count=$NUM" >> $GITHUB_OUTPUT
+          echo "Found: $COUNT cameras"
+
+      - name: Update stats.json
+        if: steps.fetch.outputs.count != ''
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          echo "{\"camerasMapped\":${{ steps.fetch.outputs.count }},\"lastUpdated\":\"$DATE\"}" > data/stats.json
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/stats.json
+          git diff --staged --quiet || git commit -m "Update DeFlock camera count [${{ steps.fetch.outputs.count }}]"
+          git push
